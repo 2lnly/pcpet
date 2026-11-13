@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pcpet"
+dynamic = ["version"]
+description = "Little pets that wander around your desktop on Linux, macOS and Windows"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["PySide6>=6.5"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+build = ["pyinstaller>=6", "pillow"]
+
+[project.gui-scripts]
+pcpet = "pcpet.app:main"
+
+[tool.setuptools]
+packages = ["pcpet"]
+
+[tool.setuptools.dynamic]
+version = { attr = "pcpet.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
