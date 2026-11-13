@@ -64,7 +64,7 @@ def test_high_drop_bounces_and_makes_dust():
 @pytest.mark.parametrize("with_cursor", [False, True])
 def test_long_simulation_stays_on_screen(species, with_cursor):
     env = Env(100.0, 50.0, 1000.0, 650.0, cursor=(700.0, 640.0) if with_cursor else None)
-    pet = make(species, x=400, y=60, seed=hash((species, with_cursor)) & 0xFFFF)
+    pet = make(species, x=400, y=60, seed=SPECIES_ORDER.index(species) * 2 + int(with_cursor))
     seen = set()
 
     def check(p):

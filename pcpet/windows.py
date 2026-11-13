@@ -60,10 +60,22 @@ class EffectWindow(QWidget):
             if self.isVisible():
                 self.hide()
             return
-        if abs(self.width() - max(3 * pet.size, 280)) > 1:
+        if abs(self.width() - int(max(3 * pet.size, 280))) > 1:
             self._resize_for(pet.size)
-        x = round(pet.x + pet.size / 2 - self._anchor.x())
-        y = round(pet.y + pet.size - self._anchor.y())
+        cx = pet.x + pet.size / 2
+        bottom = pet.y + pet.size
+        x = cx - self.width() / 2
+        y = bottom + self._margin - self.height()
+        if self.bounds is not None:
+            # Keep the top-left corner on the pet's screen: effects past the
+            # edge would be invisible anyway, and some systems (macOS) get
+            # confused by windows that start outside every screen.
+            l, t, r, _b = self.bounds
+            if r - l >= self.width():
+                x = min(max(x, l), r - self.width())
+            y = max(y, t)
+        x, y = round(x), round(y)
+        self._anchor = QPointF(cx - x, bottom - y)
         if self.pos() != QPoint(x, y):
             self.move(x, y)
         if not self.isVisible():

@@ -29,6 +29,17 @@ def tick(m, seconds=1.0, dt=1 / 30):
         m.tick()
 
 
+def calm(m, pet, limit=10.0):
+    """Tick until the pet stands on the floor, then keep it idle (pets act randomly)."""
+    for _ in range(int(limit * 30)):
+        if pet.grounded and pet.state != "land":
+            pet._enter("idle", 1000.0)
+            pet.intent = None
+            return
+        tick(m, 1 / 30)
+    raise AssertionError(f"pet never settled (state {pet.state})")
+
+
 def send(widget, kind, global_pos, button, buttons):
     local = global_pos - QPointF(widget.pos())
     ev = QMouseEvent(kind, local, global_pos, button, buttons, Qt.KeyboardModifier.NoModifier)
@@ -61,7 +72,8 @@ def test_windows_follow_their_pets(manager):
 
 def test_click_pets_and_drag_moves(manager):
     pet = manager.pets[0]
-    tick(manager, 3)  # let it land
+    calm(manager, pet)
+    tick(manager, 0.1)
     w = manager.windows[pet.id]
     L, NO = Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton
     grab = QPointF(w.pos()) + QPointF(w.width() / 2, w.height() * 0.7)
@@ -135,15 +147,18 @@ def test_settings_and_persistence(manager, tmp_path):
 
 def test_bubbles_setting_hides_speech(manager):
     pet = manager.pets[0]
-    tick(manager, 4.5)  # welcome bubble expires
+    tick(manager, 0.1)
+    effects = manager.windows[pet.id].effects.effects
+    assert effects.bubble is not None  # the welcome message
     manager.set_bubbles(False)
+    assert effects.bubble is None  # switching off hides bubbles right away
     pet.say("hello")
     tick(manager, 0.1)
-    assert manager.windows[pet.id].effects.effects.bubble is None
+    assert effects.bubble is None
     manager.set_bubbles(True)
     pet.say("hello")
     tick(manager, 0.1)
-    assert manager.windows[pet.id].effects.effects.bubble.content == "hello"
+    assert effects.bubble.content == "hello"
 
 
 def test_hide_show_and_messages(manager):
@@ -190,7 +205,8 @@ def test_screen_lookup(manager):
 
 def test_lost_mouse_release_does_not_leave_a_pet_floating(manager):
     pet = manager.pets[0]
-    tick(manager, 3)
+    calm(manager, pet)
+    tick(manager, 0.1)
     w = manager.windows[pet.id]
     L, NO = Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton
     grab = QPointF(w.pos()) + QPointF(w.width() / 2, w.height() * 0.7)
@@ -200,8 +216,7 @@ def test_lost_mouse_release_does_not_leave_a_pet_floating(manager):
     # the release never arrives; the next frame notices no button is held
     tick(manager, 0.1)
     assert not w.dragging and pet.state in ("fall", "land")
-    tick(manager, 3)
-    assert pet.grounded
+    calm(manager, pet, limit=3.0)  # it lands instead of floating forever
 
 
 def test_pets_live_on_the_screen_they_are_on(manager):
@@ -211,10 +226,29 @@ def test_pets_live_on_the_screen_they_are_on(manager):
     a = manager.add_pet("cat", at=(100, 100))
     b = manager.add_pet("dog", at=(1000, 150))
     c = manager.add_pet("slime", at=(805, 40))  # in the gap above the right screen
-    tick(manager, 4)
-    assert b.y == right_screen[3] - b.size and c.y == right_screen[3] - c.size
-    assert a.y == left_screen[3] - a.size
-    for _ in range(60):
-        tick(manager, 1)
-        for pet, (l, t, r, bottom) in ((a, left_screen), (b, right_screen), (c, right_screen)):
+    homes = ((a, left_screen), (b, right_screen), (c, right_screen))
+    landed = set()
+    for _ in range(60 * 30):
+        tick(manager, 1 / 30)
+        for pet, (l, t, r, bottom) in homes:
             assert l <= pet.x <= r - pet.size and t <= pet.y <= bottom - pet.size, pet.species.id
+            if pet.y == bottom - pet.size:
+                landed.add(pet.id)
+    assert landed == {a.id, b.id, c.id}  # each one stood on its own screen's floor
+
+
+def test_effects_layer_stays_on_screen_and_follows_the_pet(manager):
+    pet = manager.pets[0]
+    calm(manager, pet)
+    l, t, r, b = manager._screens[0]
+    effects = manager.windows[pet.id].effects
+    for x, y in ((l, t), (r - pet.size, t), ((l + r) / 2, b - pet.size)):
+        pet.x, pet.y = x, y
+        pet.say("hi")
+        tick(manager, 1 / 30)
+        assert effects.isVisible()
+        assert l <= effects.x() and t <= effects.y() and effects.x() + effects.width() <= r
+        # the anchor is the pet's bottom centre, wherever the layer ended up
+        assert effects.x() + effects._anchor.x() == pytest.approx(pet.x + pet.size / 2, abs=1)
+        assert effects.y() + effects._anchor.y() == pytest.approx(pet.y + pet.size, abs=1)
+        pet._enter("idle", 1000.0)

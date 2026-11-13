@@ -271,6 +271,9 @@ class PetManager(QObject):
 
     def set_bubbles(self, enabled: bool):
         self.settings["bubbles"] = bool(enabled)
+        if not enabled:
+            for window in self.windows.values():
+                window.effects.effects.bubble = None
         self._rebuild_tray_menu()
         self.schedule_save()
 
