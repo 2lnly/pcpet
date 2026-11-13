@@ -115,16 +115,25 @@ def _objc():
     return _objc_cache
 
 
+def _on_cocoa() -> bool:
+    """True only with Qt's native macOS backend; winId() is an NSView* only there."""
+    from PySide6.QtGui import QGuiApplication
+
+    return IS_MAC and QGuiApplication.platformName() == "cocoa"
+
+
 def _ns_window(widget):
+    if not _on_cocoa():
+        return None
     sel, get_ptr, _, _ = _objc()
-    view = int(widget.winId())  # an NSView* on macOS
+    view = int(widget.winId())  # an NSView* with the cocoa backend
     if not view:
         return None
     return get_ptr(view, sel(b"window")) or None
 
 
 def mac_collection_behavior(widget) -> int | None:
-    if not IS_MAC:
+    if not _on_cocoa():
         return None
     try:
         window = _ns_window(widget)
@@ -138,7 +147,7 @@ def mac_collection_behavior(widget) -> int | None:
 
 def mac_join_all_spaces(widget) -> bool:
     """Make a window visible on every Space. Returns True on success."""
-    if not IS_MAC:
+    if not _on_cocoa():
         return False
     try:
         window = _ns_window(widget)

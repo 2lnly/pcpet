@@ -28,10 +28,13 @@ def test_other_choices_are_respected():
     assert platform_setup.prepare_environment(env) == [] and "QT_QPA_PLATFORM" not in env
 
 
-def test_mac_helpers_are_harmless_elsewhere(qapp):
+def test_mac_helpers_do_nothing_without_the_native_mac_backend(qapp):
+    # The tests run on Qt's "offscreen" backend, where window ids are not
+    # Cocoa views; touching them through the Objective-C runtime would crash.
     from PySide6.QtWidgets import QWidget
 
     w = QWidget()
-    if not platform_setup.IS_MAC:
-        assert platform_setup.mac_join_all_spaces(w) is False
-        assert platform_setup.mac_collection_behavior(w) is None
+    w.show()
+    assert platform_setup.mac_join_all_spaces(w) is False
+    assert platform_setup.mac_collection_behavior(w) is None
+    w.close()
