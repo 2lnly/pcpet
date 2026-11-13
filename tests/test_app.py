@@ -202,3 +202,19 @@ def test_lost_mouse_release_does_not_leave_a_pet_floating(manager):
     assert not w.dragging and pet.state in ("fall", "land")
     tick(manager, 3)
     assert pet.grounded
+
+
+def test_pets_live_on_the_screen_they_are_on(manager):
+    # Two monitors side by side with different heights (taskbar on the second).
+    left_screen, right_screen = (0.0, 0.0, 800.0, 600.0), (800.0, 100.0, 1440.0, 580.0)
+    manager._screens = [left_screen, right_screen]
+    a = manager.add_pet("cat", at=(100, 100))
+    b = manager.add_pet("dog", at=(1000, 150))
+    c = manager.add_pet("slime", at=(805, 40))  # in the gap above the right screen
+    tick(manager, 4)
+    assert b.y == right_screen[3] - b.size and c.y == right_screen[3] - c.size
+    assert a.y == left_screen[3] - a.size
+    for _ in range(60):
+        tick(manager, 1)
+        for pet, (l, t, r, bottom) in ((a, left_screen), (b, right_screen), (c, right_screen)):
+            assert l <= pet.x <= r - pet.size and t <= pet.y <= bottom - pet.size, pet.species.id
